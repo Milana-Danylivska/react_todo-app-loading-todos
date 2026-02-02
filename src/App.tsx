@@ -6,21 +6,54 @@ import { UserWarning } from './UserWarning';
 import { getTodos, USER_ID } from './api/todos';
 import { Todo } from './types/Todo';
 
+enum FilterStatus {
+  All = 'all',
+  Active = 'active',
+  Completed = 'completed',
+}
+
+enum ErrorMessage {
+  LoadTodos = 'Unable to load todos',
+}
+
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>(
+    FilterStatus.All,
+  );
 
-  // #region effects
+  const areAllTodosCompleted =
+    todos.length > 0 && todos.every(todo => todo.completed);
+
+  const getActiveTodosCount = (items: Todo[]) =>
+    items.filter(todo => !todo.completed).length;
+
+  const getVisibleTodos = (items: Todo[], filter: FilterStatus): Todo[] => {
+    switch (filter) {
+      case FilterStatus.Active:
+        return items.filter(todo => !todo.completed);
+
+      case FilterStatus.Completed:
+        return items.filter(todo => todo.completed);
+
+      default:
+        return items;
+    }
+  };
+
+  const visibleTodos = getVisibleTodos(todos, filterStatus);
+
   useEffect(() => {
     if (!USER_ID) {
       return;
     }
 
     setErrorMessage('');
+
     getTodos()
       .then(setTodos)
-      .catch(() => setErrorMessage('Unable to load todos'));
+      .catch(() => setErrorMessage(ErrorMessage.LoadTodos));
   }, []);
 
   useEffect(() => {
@@ -34,25 +67,11 @@ export const App: React.FC = () => {
 
     return () => clearTimeout(timerId);
   }, [errorMessage]);
-  // #endregion
 
   if (!USER_ID) {
     return <UserWarning />;
   }
 
-  const visibleTodos = todos.filter(todo => {
-    if (filterStatus === 'active') {
-      return !todo.completed;
-    }
-
-    if (filterStatus === 'completed') {
-      return todo.completed;
-    }
-
-    return true;
-  });
-
-  // #region render
   return (
     <div className="todoapp">
       <h1 className="todoapp__title">todos</h1>
@@ -62,7 +81,7 @@ export const App: React.FC = () => {
           <button
             type="button"
             className={classNames('todoapp__toggle-all', {
-              active: todos.length > 0 && todos.every(todo => todo.completed),
+              active: areAllTodosCompleted,
             })}
             data-cy="ToggleAllButton"
             aria-label="Toggle all todos"
@@ -83,7 +102,9 @@ export const App: React.FC = () => {
             {visibleTodos.map(todo => (
               <div
                 data-cy="Todo"
-                className={classNames('todo', { completed: todo.completed })}
+                className={classNames('todo', {
+                  completed: todo.completed,
+                })}
                 key={todo.id}
               >
                 <label className="todo__status-label">
@@ -100,6 +121,7 @@ export const App: React.FC = () => {
                 <span data-cy="TodoTitle" className="todo__title">
                   {todo.title}
                 </span>
+
                 <button
                   type="button"
                   className="todo__remove"
@@ -121,17 +143,17 @@ export const App: React.FC = () => {
         {todos.length > 0 && (
           <footer className="todoapp__footer" data-cy="Footer">
             <span className="todo-count" data-cy="TodosCounter">
-              {todos.filter(todo => !todo.completed).length} items left
+              {getActiveTodosCount(todos)} items left
             </span>
 
             <nav className="filter" data-cy="Filter">
               <a
                 href="#/"
                 className={classNames('filter__link', {
-                  selected: filterStatus === 'all',
+                  selected: filterStatus === FilterStatus.All,
                 })}
                 data-cy="FilterLinkAll"
-                onClick={() => setFilterStatus('all')}
+                onClick={() => setFilterStatus(FilterStatus.All)}
               >
                 All
               </a>
@@ -139,10 +161,10 @@ export const App: React.FC = () => {
               <a
                 href="#/active"
                 className={classNames('filter__link', {
-                  selected: filterStatus === 'active',
+                  selected: filterStatus === FilterStatus.Active,
                 })}
                 data-cy="FilterLinkActive"
-                onClick={() => setFilterStatus('active')}
+                onClick={() => setFilterStatus(FilterStatus.Active)}
               >
                 Active
               </a>
@@ -150,10 +172,10 @@ export const App: React.FC = () => {
               <a
                 href="#/completed"
                 className={classNames('filter__link', {
-                  selected: filterStatus === 'completed',
+                  selected: filterStatus === FilterStatus.Completed,
                 })}
                 data-cy="FilterLinkCompleted"
-                onClick={() => setFilterStatus('completed')}
+                onClick={() => setFilterStatus(FilterStatus.Completed)}
               >
                 Completed
               </a>
@@ -189,5 +211,4 @@ export const App: React.FC = () => {
       </div>
     </div>
   );
-  // #endregion
 };
